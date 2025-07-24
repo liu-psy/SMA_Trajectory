@@ -22,7 +22,7 @@
 
 **1. R (4.4.3):**
    - **lmerTest** (association analysis)
-   = **neuroCombat** (MRI harmonization)
+   - **neuroCombat** (MRI harmonization)
    - **lavvan** (bilateral change score models)
 
 **2. Python (3.12.4):**
