@@ -1,6 +1,5 @@
-# Development changes of environmental factors between baseline and 4YFU
-# Bilateral change score models between 2YFU and 4YFU
 library(lavaan)
+library(openxlsx)
 library(lmerTest)
 library(tidyverse)
 
@@ -17,26 +16,20 @@ environments[1:8] <- environments[c(1:2, 6:8, 3:5)]
 environments[9:17] <- environments[c(9:14, 17, 15, 16)]
 
 # select data
-longitudinal_2Y <- select(data_2Y, src_subject_id, eventname, screen_class, 
-                          all_of(screens), all_of(covarites), 
-                          all_of(environments)) %>%
-  filter(complete.cases(.))
-  
-longitudinal_4Y <- select(data_4Y, src_subject_id, eventname, screen_class, 
-                          all_of(screens), all_of(covarites), 
-                          all_of(environments)) %>%
+environment_2Y <- select(data_2Y, src_subject_id, eventname, screen_class, 
+                         all_of(screens), all_of(covarites), 
+                         all_of(environments)) %>%
   filter(complete.cases(.))
 
-common_ID <- list(longitudinal_2Y$src_subject_id, longitudinal_4Y$src_subject_id) %>%
-  reduce(intersect)
+environment_4Y <- select(data_4Y, src_subject_id, eventname, screen_class, 
+                         all_of(screens), all_of(covarites), 
+                         all_of(environments)) %>%
+  filter(complete.cases(.))
 
-longitudinal_2Y <- filter(longitudinal_2Y, src_subject_id %in% common_ID)
-longitudinal_4Y <- filter(longitudinal_4Y, src_subject_id %in% common_ID)
-
-select(data_2Y, interview_age) %>%
+select(environment_2Y, interview_age) %>%
   summarise_all(list(mean, sd))
 
-select(data_4Y, interview_age) %>%
+select(environment_4Y, interview_age) %>%
   summarise_all(list(mean, sd))
 
 environment_labels <- c("Family Conflict", "Parental Monitoring",
@@ -66,19 +59,25 @@ vars_need_invert <- c("pmq_y_ss_mean",  "neighborhood_crime_y",
                       "pbp_ss_prosocial_peers", "srpf_y_ss_ses", 
                       "srpf_y_ss_iiss")
 
-# Apply the function 
-longitudinal_2Y <- Reduce(function(data, var) invert_vars(var, data), 
-                          vars_need_invert, init = longitudinal_2Y)
-longitudinal_4Y <- Reduce(function(data, var) invert_vars(var, data), 
-                          vars_need_invert, init = longitudinal_4Y)
+# Apply the  function 
+environment_2Y <- Reduce(function(data, var) invert_vars(var, data), 
+                         vars_need_invert, init = environment_2Y)
+environment_4Y <- Reduce(function(data, var) invert_vars(var, data), 
+                         vars_need_invert, init = environment_4Y)
 
-# changes ----------------------------------------------------------------------
+# development changes ----------------------------------------------------------
 development_scores <- function(x, data1, data2) {
   changes <- data1[[x]] - data2[[x]]
   changes_score <- lm(changes ~ data2[[x]]) %>%
     residuals()
   return(changes_score)
 }
+
+common_ID <- list(environment_2Y$src_subject_id, environment_4Y$src_subject_id) %>%
+  reduce(intersect)
+
+longitudinal_2Y <- filter(environment_2Y, src_subject_id %in% common_ID)
+longitudinal_4Y <- filter(environment_4Y, src_subject_id %in% common_ID)
 
 data_changes_2Y4Y <- sapply(environments, development_scores, longitudinal_4Y, longitudinal_2Y) %>%
   cbind(select(longitudinal_2Y, src_subject_id, screen_class, all_of(covarites)))
@@ -130,26 +129,6 @@ show_fdr <- function(lmm_results) {
   lmm_results <- lmm_results[, lmm_results["p_fdr", ] < 0.05]
   return(lmm_results)
 }
-
-# 2YFU
-lmm_environments_2Y_13 <- lmm_modality(longitudinal_2Y, c("Persistently Low", "Increasing"))
-lmm_environments_2Y_13_fdr <- lapply(lmm_environments_2Y_13, show_fdr)
-
-lmm_environments_2Y_12 <- lmm_modality(longitudinal_2Y, c("Persistently Low", "Decreasing"))
-lmm_environments_2Y_12_fdr <- lapply(lmm_environments_2Y_12, show_fdr)
-
-lmm_environments_2Y_23 <- lmm_modality(longitudinal_2Y, c("Decreasing", "Increasing"))
-lmm_environments_2Y_23_fdr <- lapply(lmm_environments_2Y_23, show_fdr)
-
-# 4YFU
-lmm_environments_4Y_13 <- lmm_modality(longitudinal_4Y, c("Persistently Low", "Increasing"))
-lmm_environments_4Y_13_fdr <- lapply(lmm_environments_4Y_13, show_fdr)
-
-lmm_environments_4Y_12 <- lmm_modality(longitudinal_4Y, c("Persistently Low", "Decreasing"))
-lmm_environments_4Y_12_fdr <- lapply(lmm_environments_4Y_12, show_fdr)
-
-lmm_environments_4Y_23 <- lmm_modality(longitudinal_4Y, c("Decreasing", "Increasing"))
-lmm_environments_4Y_23_fdr <- lapply(lmm_environments_4Y_23, show_fdr)
 
 # development change
 lmm_environments_2Y4Y_13 <- lmm_modality(data_changes_2Y4Y, c("Persistently Low", "Increasing"))
